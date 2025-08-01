@@ -1,0 +1,6 @@
+Flask
+openai
+python-dotenv
+PyPDF2
+youtubesearchpython
+gunicorn
