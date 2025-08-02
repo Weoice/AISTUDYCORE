@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 from flask import Flask, request, render_template, jsonify
 from werkzeug.utils import secure_filename
+
 load_dotenv()
 
 print("KEY LOADED:", os.getenv("OPENAI_API_KEY"))
