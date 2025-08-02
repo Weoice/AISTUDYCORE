@@ -1,6 +1,6 @@
 Flask
 openai
 python-dotenv
-youtubesearchpython
+youtube-search-python
 PyPDF2
 gunicorn
