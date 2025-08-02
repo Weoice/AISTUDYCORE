@@ -1,6 +1,7 @@
-Flask
-openai
-python-dotenv
-youtube-search-python
-PyPDF2
-gunicorn
+Flask==2.3.3
+openai==1.11.0
+python-dotenv==1.0.1
+youtube-search-python==1.6.6
+PyPDF2==3.0.1
+httpx==0.27.0
+gunicorn==21.2.0
