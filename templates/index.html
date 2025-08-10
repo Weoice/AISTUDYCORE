@@ -1,589 +1,409 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>AI Study Guide</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>StudyCore — AI Study Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background: #040303;
-      font-family: 'Segoe UI', sans-serif;
-      color: white;
+    :root { --glass: rgba(255,255,255,0.08); --acc:#6ee7ff; --acc2:#7c3aed; }
+    body { background: radial-gradient(1200px 600px at 20% -10%, #1b1f2b 0%, #0b0f17 60%) fixed; color:#e5e7eb; font-family: ui-sans-serif,system-ui; }
+    .nav-glass { background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.2)); backdrop-filter: blur(10px); border-bottom:1px solid rgba(255,255,255,.08); }
+    .hero { max-width: 980px; margin: 40px auto 16px; text-align:center; padding: 16px; }
+    .hero h1 { font-weight: 800; background: linear-gradient(90deg, #fff, #a5f3fc 55%, #c4b5fd 90%); -webkit-background-clip:text; background-clip:text; color: transparent; }
+    .glass { background: var(--glass); border: 1px solid rgba(255,255,255,.10); border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+    .btn-acc { background: linear-gradient(90deg, var(--acc2), var(--acc)); border: none; color: #0b0f17 !important; font-weight: 700; }
+    .progress-thin { height: 10px; }
+    
+
+    /* Brand & logo contrast */
+    .navbar .navbar-brand span{
+      font-weight:900; letter-spacing:.3px;
+      background: linear-gradient(90deg,#FFFFFF 0%,#A5F3FC 55%,#C4B5FD 90%);
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color: transparent;
     }
-    .container {
-      padding-top: 30px;
-    }
-    .tab-content {
-      margin-top: 1rem;
-    }
-    .video-card {
-  margin-bottom: 20px;
-  padding: 5px;
-  width: 100%;
-  max-width: 320px;
-  font-size: 0.85rem;
+    .navbar .navbar-brand .brand-accent{ filter: drop-shadow(0 0 8px rgba(124,58,237,.45)); }
+
+    /* Inputs readable on dark */
+    .form-control, .form-select { background-color:#111827; color:#EAF2FF; border:1px solid rgba(255,255,255,.18); }
+    .form-control::placeholder{ color:#90A4C0; opacity:.9; }
+    .form-select option{ color:#0b0f17; }
+
+    /* Lesson text contrast */
+    .lesson-title{ color:#EAF2FF; font-weight:800; letter-spacing:.2px; }
+    .lesson-desc{ color:#CFE3FF; opacity:.95; }
+
+    /* Quiz readability */
+    .card.glass h5, .card.glass h4, .card.glass strong { color:#F6FAFF; }
+    .btn-outline-light{ color:#EAF2FF; border-color:rgba(255,255,255,.35); }
+    .progress.indeterminate .progress-bar{
+  position: relative;
+  width: 100% !important;
+  background-color: #22d3ee; /* cyan */
+  overflow: hidden;
 }
-.video-thumb {
-  max-width: 100%;
+#loadingBar{
+  position: relative;
+  overflow: hidden;
   border-radius: 8px;
 }
 
-
-    .btn-answer {
-      margin: 5px 0;
-      width: 100%;
-    }
-    .correct { background-color: #d4edda !important; }
-    .incorrect { background-color: #f8d7da !important; }
-    .custom-cyan {
-      background-color: #00bcd4 !important;
-      color: white;
-    }
-    #loadingBar {
-      height: 16px;
-      width: 70%;
-      margin: 40px auto;
-      display: none;
-    }
-    .logo-img {
-      width: 300px;
-      height: 220px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: block;
-      margin: 0 auto 20px;
-    }
-    .flashcard { padding: 20px; border-radius: 10px; background: #f4f4f4; margin: 10px 0; }
-    #notes-sidebar {
-      position: fixed;
-      top: 0;
-      right: -300px;
-      width: 300px;
-      height: 100%;
-      background: white;
-      box-shadow: -2px 0 5px rgba(0,0,0,0.2);
-      padding: 20px;
-      transition: right 0.3s ease-in-out;
-      z-index: 1000;
-    }
-    #notes-sidebar.show { right: 0; }
-    #toggle-notes { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 1001; }
-    #tinyLoadingBar {
-  height: 6px;
-  width: 100%;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  background: transparent;
-  display: none;
-  z-index: 9999;
+.progress-thin{ height:18px; }
+#loadingBar{ margin-top:10px; }
+#loadingBar #loadingText{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:.9rem; font-weight:600; color:#EAF2FF; pointer-events:none;
 }
-.ratio.ratio-16x9 {
-    max-width: 600px;
-    margin: 0 auto 1rem; 
-  }
-   #videos .row.justify-content-center {
-    max-width: 900px;    /* whichever max width you prefer */
-    margin: 0 auto;      /* center it */
-    gap: 1rem;           /* grid gap */
-  }
+.quiz-result .result-text{ color:#EAF2FF !important; opacity:1 !important; }
 
-  
-  #videos .card {
-    max-width: 280px;   
-    margin: 0 auto;      
-  }
-  #videos .card-body {
-    padding: 0.5rem;     
-  }
 
-  
-  #videos .card-img-top {
-    margin-bottom: 0.5rem;
-  }
-#tinyProgressFill {
-  height: 100%;
-  width: 0%;
-  background-color: #00bcd4;
-  transition: width 0.2s ease;
-}
-.navbar-brand {
-  font-size: 1.4rem;
-  font-weight: bold;
+/* kill Bootstrap's static fill color so the track doesn't look solid */
+#loadingBar .progress-bar{
+  background: transparent !important;
+  width: 100% !important;
 }
 
-@media (max-width: 768px) {
-  .video-card {
-    margin-bottom: 20px;
-  }
-  .video-thumb {
-    width: 100%;
-    height: auto;
-  }
+/* turn animation on by adding .active to #loadingBar */
+#loadingBar.active::after{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    linear-gradient(90deg,
+      rgba(34,211,238,.15) 0%,
+      rgba(34,211,238,.45) 50%,
+      rgba(34,211,238,.15) 100%);
+  background-size: 200% 100%;
+  animation: sc-sheen 1s linear infinite;
+  /* subtle tint for the track itself */
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+@keyframes sc-sheen{
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+/* Force quiz score and similar status texts to be readable */
+.quiz-result h4,
+.quiz-result .result-text,
+.quiz-score {
+  color: #eaf2ff !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+/* Tiny quiz loader uses container shimmer too */
+#tinyLoadingBar{
+  position: relative; overflow: hidden; border-radius: 8px;
+  height: 12px;                           /* thin strip */
+}
+#tinyLoadingBar .progress-bar{ background: transparent !important; width:100% !important; }
+#tinyLoadingBar.active::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(90deg,
+    rgba(34,211,238,.15) 0%,
+    rgba(34,211,238,.45) 50%,
+    rgba(34,211,238,.15) 100%);
+  background-size: 200% 100%;
+  animation: sc-sheen 1s linear infinite;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
 }
 
   </style>
-  
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
-  <a class="navbar-brand" href="#">📘StudyCore</a>
-  <div class="ms-auto d-flex">
-    <a href="/upload" class="btn btn-outline-light me-2">Upload Document</a>
-    <a href="/login" class="btn btn-primary">Login</a>
+<nav class="navbar navbar-expand-lg nav-glass sticky-top px-3">
+  <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+    <img src="{{ url_for('static', filename='Sattys.png') }}" alt="StudyCore logo"
+         width="28" height="28" class="rounded-circle"
+         style="box-shadow:0 0 0 2px rgba(255,255,255,.12);">
+    <span>Studycore<span class="brand-accent"></span></span>
+  </a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/upload" class="btn btn-sm btn-outline-light">Upload</a>
+    <a href="#" class="btn btn-sm btn-acc">Login</a>
   </div>
 </nav>
-<div class="mt-4"></div>
 
+<header class="hero">
+  
+  <h1 class="display-6">AIStudyCore</h1>
+  <p class="text-secondary">AI Study Guide. Flashcards. Quizzes. Upload Documents. Notetaking. And much more</p>
+  <form method="POST" class="d-flex justify-content-center gap-2 mt-3">
+    <input type="text" name="subject" class="form-control w-50 glass" placeholder="e.g. AP Human Geography, Algebra 2, Photosynthesis" required>
+    <button class="btn btn-acc px-4">Generate</button>
+  </form>
+</header>
 
 <div class="container">
-  <img src="{{ url_for('static', filename='Sattys.png') }}" alt="Sattys Logo" class="logo-img">
+  <!-- MAIN LOADING BAR -->
+  <div id="loadingBar" class="progress progress-thin glass mb-3" style="display:none;">
+  <div id="progressFill" class="progress-bar" role="progressbar"></div>
+  <span id="loadingText">Generating, please wait…</span>
+</div>
 
-  <form method="POST">
-    <div class="input-group mb-4">
-      <input type="text" name="subject" class="form-control" placeholder="Enter a topic (e.g. Photosynthesis)" required>
-      <button class="btn btn-primary">Generate</button>
-    </div>
-  </form>
 
-  <div id="loadingBar" class="progress">
-    <div id="progressFill" class="progress-bar progress-bar-striped progress-bar-animated custom-cyan" style="width: 0%">Loading...</div>
-  </div>
+
+
   {% if output %}
-    <ul class="nav nav-tabs mb-3">
-  <li class="nav-item">
-    <button class="nav-link active" id="course-tab" data-bs-toggle="tab" data-bs-target="#course">📘 AI Course</button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link" id="quiz-tab" data-bs-toggle="tab" data-bs-target="#quiz">🧠 Quiz</button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link" id="videos-tab" data-bs-toggle="tab" data-bs-target="#videos">📼 Extra Videos</button>
-  </li>
-  <li class="nav-item">
-    <form method="GET" action="/flashcards/{{ output.subject | urlencode }}">
-      <button type="submit" class="nav-link btn btn-link" style="text-decoration: none;">📇 Flashcards</button>
-    </form>
-  </li>
-</ul>
+    {% if output.error %}
+      <div class="alert alert-danger">{{ output.error }}</div>
+    {% endif %}
 
+    <ul class="nav nav-tabs glass ps-2" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#course">📘 AI Course</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#quiz">🧠 Quiz</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#videos">📼 Extra Videos</button></li>
+      <li class="nav-item">
+        <form method="GET" class="m-0" action="/flashcards/{{ output.subject | urlencode }}">
+          <button type="submit" class="nav-link">📇 Flashcards</button>
+        </form>
+      </li>
+    </ul>
 
     <div class="tab-content">
-      <div class="tab-pane fade show active" id="plan"><pre>{{ output.plan }}</pre></div>
-      <div id="mainQuizContainer">
-    
-</div>
-
-      <div class="tab-pane fade" id="videos">
-  <h5 class="my-3">📺 Extra Videos on {{ output.subject }}</h5>
-  <p>Recommended Channel: <strong>{{ output.channel }}</strong></p>
-  <div class="row justify-content-center g-3">
-  {% for video in output.videos %}
-  <div class="col-sm-6 col-md-4 col-lg-3">
-    <div class="card bg-dark text-white h-100 shadow-sm" style="min-height: 280px;">
-      <a href="{{ video.link }}" target="_blank">
-        <img src="https://img.youtube.com/vi/{{ video.link.split('=')[-1] }}/0.jpg" class="card-img-top rounded" style="max-height: 160px; object-fit: cover;">
-        <div class="card-body">
-          <p class="card-text" style="font-size: 0.9rem;">{{ video.title }}</p>
+      <div class="tab-pane fade show active" id="course">
+        <div class="glass p-3 mt-3">
+          <p class="mb-1 text-secondary">Course</p>
+          <p class="mb-0">{{ output.plan }}</p>
         </div>
-      </a>
-    </div>
-  </div>
-  {% endfor %}
-</div>
 
-
-</div>
-
-      <div class="tab-pane fade" id="flashcards">
-        {% for topic in output.topics %}
-          <div class="flashcard"><strong>{{ topic.title }}</strong><br>{{ topic.description }}</div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-</div>
-  {% if output and output.topics %}
-    <h4 class="mt-4">📚 Course: {{ output.subject }}</h4>
-    {% for lesson in output.topics %}
-    <div class="card my-4">
-      <div class="card-body">
-        <h5 class="card-title">🎓 {{ lesson.title }}</h5>
-        <p>{{ lesson.description }}</p>
-        {% if lesson.video %}
-        <div class="ratio ratio-16x9 mb-3">
-          <iframe src="{{ lesson.video | replace('watch?v=', 'embed/') }}" frameborder="0" allowfullscreen></iframe>
-        </div>
-        {% endif %}
-        {% if lesson.quiz %}
-        <h6>📝 Quiz</h6>
-        {% for q in lesson.quiz %}
-        <div class="mb-3">
-          <strong>{{ q.question }}</strong>
-          <div class="mt-2">
-            {% for opt in q.options %}
-            <button class="btn btn-outline-secondary btn-sm btn-answer" onclick="checkLocalAnswer(this, '{{ opt[0] }}', '{{ q.answer }}')">{{ opt }}</button>
-            {% endfor %}
+        {% for lesson in output.topics %}
+        <div class="card glass mt-4">
+          <div class="card-body">
+            <h5 class="card-title lesson-title">🎓 {{ lesson.title }}</h5>
+            <p class="mb-3 lesson-desc">{{ lesson.description }}</p>
+            {% if lesson.video %}
+            <div class="ratio ratio-16x9 mb-3">
+              <iframe src="{{ lesson.video | replace('watch?v=', 'embed/') }}" allowfullscreen></iframe>
+            </div>
+            {% endif %}
+            {% if lesson.quiz %}
+              <h6>📝 Quick Check</h6>
+              {% for q in lesson.quiz %}
+              <div class="mb-2">
+                <strong>{{ q.question }}</strong>
+                <div class="mt-2">
+                  {% for opt in q.options %}
+                  <button class="btn btn-sm btn-outline-light my-1 w-100 text-start"
+                          onclick="checkLocalAnswer(this, '{{ opt[0] }}', '{{ q.answer }}')">
+                    {{ opt }}
+                  </button>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endfor %}
+            {% endif %}
           </div>
         </div>
         {% endfor %}
-        {% endif %}
+
+        <form method="POST" class="text-center my-4" id="continue-form">
+          <input type="hidden" name="subject" value="{{ output.subject }}">
+          {% for topic in output.topics %}
+            <input type="hidden" name="past_topics" value="{{ topic.title }}">
+            <input type="hidden" name="past_descriptions" value="{{ topic.description }}">
+            <input type="hidden" name="past_videos" value="{{ topic.video }}">
+            <input type="hidden" name="past_quizzes" value='{{ topic.quiz | tojson | safe }}'>
+          {% endfor %}
+          <button id="continueCourseBtn" class="btn btn-acc px-4" data-clicks="0">Continue Course</button>
+        </form>
+      </div>
+
+      <div class="tab-pane fade" id="quiz">
+        <div id="tinyLoadingBar" class="progress progress-thin glass mt-3" style="display:none;">
+          <div id="tinyProgressFill" class="progress-bar" style="width:0%"></div>
+        </div>
+        <div id="mainQuizContainer" class="mt-3"></div>
+      </div>
+
+      <div class="tab-pane fade" id="videos">
+        <div class="row g-3 mt-1">
+          {% for video in output.videos %}
+          <div class="col-12 col-sm-6 col-lg-4">
+            <div class="card glass p-2 h-100">
+              <a href="{{ video.link }}" target="_blank" class="text-decoration-none text-light">
+                <img src="https://img.youtube.com/vi/{{ video.link.split('=')[-1] }}/0.jpg"
+                     class="rounded w-100 mb-2" style="object-fit:cover; max-height:170px;">
+                <div class="px-1 pb-2">
+                  <div class="fw-semibold">{{ video.title }}</div>
+                  <div class="text-secondary small">Open on YouTube ↗</div>
+                </div>
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
-    {% endfor %}
-
-    <form method="POST" class="text-center" id="continue-form">
-      <input type="hidden" name="subject" value="{{ output.subject }}">
-      {% for topic in output.topics %}
-      <input type="hidden" name="past_topics" value="{{ topic.title.split(': ', 1)[1] }}">
-      <input type="hidden" name="past_descriptions" value="{{ topic.description }}">
-      <input type="hidden" name="past_videos" value="{{ topic.video }}">
-      <input type="hidden" name="past_quizzes" value='{{ topic.quiz | tojson | safe }}'>
-      {% endfor %}
-      <button id="continueCourseBtn" class="btn btn-primary" data-clicks="0">Continue Course</button>
-
-    </form>
   {% endif %}
-
-
-
-<div id="toggle-notes"><button class="btn btn-dark" onclick="toggleNotes()">🗒️ Notes</button></div>
-<div id="notes-sidebar">
-  <div class="d-flex justify-content-between align-items-center">
-    <h5>🗒️ Notes</h5>
-    <button class="btn-close" aria-label="Close" onclick="toggleNotes()"></button>
-  </div>
-  <textarea class="form-control mt-2" rows="20" placeholder="Write your notes here..."></textarea>
 </div>
 
+{% if output %}
+<script id="jinja-data" type="application/json">
+{{ {"subject": output.subject, "topics": output.topics | map(attribute='title') | list } | tojson }}
+</script>
+{% endif %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  
-function showLoadingBar() {
+function showLoadingBar(){
   const bar = document.getElementById("loadingBar");
-  const fill = document.getElementById("progressFill");
-  bar.style.display = "block";
-  fill.style.width = "0%";
-  let width = 0;
-  const interval = setInterval(() => {
-    width += 5;
-    fill.style.width = width + "%";
-    if (width >= 100) clearInterval(interval);
-  }, 100);
-  return interval;
+  if(!bar) return;
+  bar.style.display = "block";     // reveal
+  // restart animation reliably
+  bar.classList.remove("active");
+  void bar.offsetWidth;            // force reflow
+  bar.classList.add("active");
 }
-
-
-function hideLoadingBar() {
+function hideLoadingBar(){
   const bar = document.getElementById("loadingBar");
-  const fill = document.getElementById("progressFill");
+  if(!bar) return;
+  bar.classList.remove("active");
   bar.style.display = "none";
-  fill.style.width = "0%";
-}
-function showTinyLoadingBar() {
-  const bar = document.getElementById("tinyLoadingBar");
-  const fill = document.getElementById("tinyProgressFill");
-  bar.style.display = "block";
-  fill.style.width = "0%";
-  let width = 0;
-  const interval = setInterval(() => {
-    width += 5;
-    fill.style.width = width + "%";
-    if (width >= 100) clearInterval(interval);
-  }, 100);
-  return interval;
 }
 
-function hideTinyLoadingBar() {
-  const bar = document.getElementById("tinyLoadingBar");
-  const fill = document.getElementById("tinyProgressFill");
-  bar.style.display = "none";
-  fill.style.width = "0%";
-}
+/* Trigger on Generate (no preventDefault) */
+document.addEventListener("DOMContentLoaded", () => {
+  const genForm = document.querySelector('form[method="POST"]');
+  genForm?.addEventListener("submit", () => { showLoadingBar(); }, { once:true });
+});
+</script>
 
-function checkLocalAnswer(button, selected, correct) {
+
+<script>
+/* Main loading bar shows immediately on submit */
+
+
+/* Quick‑check buttons in lessons */
+function checkLocalAnswer(button, selected, correct){
   const buttons = button.parentNode.querySelectorAll('button');
-  buttons.forEach(b => {
+  buttons.forEach(b=>{
     b.disabled = true;
-    const bLetter = b.textContent.trim().charAt(0);
-    if (bLetter === correct) {
-      b.classList.remove('btn-outline-secondary');
-      b.classList.add('btn-success');
-    } else if (b === button) {
-      b.classList.remove('btn-outline-secondary');
-      b.classList.add('btn-danger');
-    }
+    const L = (b.textContent||"").trim().charAt(0);
+    b.classList.remove('btn-outline-light');
+    if(L===correct){ b.classList.add('btn-success'); }
+    else if(b===button){ b.classList.add('btn-danger'); }
   });
 }
 
-function toggleNotes() {
-  const sidebar = document.getElementById('notes-sidebar');
-  const toggleBtn = document.getElementById('toggle-notes');
-  sidebar.classList.toggle('show');
-  toggleBtn.style.display = sidebar.classList.contains('show') ? 'none' : 'block';
-}
-function loadFlashcards(subject) {
-  showLoadingBar(); // Keep them on current page with loading bar
-
-  fetch("/generate_flashcards_from_subject", {
-    method: "POST",
-    body: JSON.stringify({ subject }),
-    headers: {
-      "Content-Type": "application/json"
-    }
-  })
-  .then(response => response.json())
-  .then(data => {
-    sessionStorage.setItem("flashcardsData", JSON.stringify(data));
-    window.location.href = `/flashcards/${encodeURIComponent(subject)}`;
-  })
-  .catch(error => {
-    console.error("Flashcards fetch failed:", error);
-    alert("Failed to generate flashcards.");
-    hideLoadingBar();
-  });
-}
-
-
-
-window.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("form").forEach(form => {
-    form.addEventListener("submit", function (e) {
-      const loading = showLoadingBar();
-      e.preventDefault(); // stop default
-      setTimeout(() => form.submit(), 200); // wait 200ms before submitting
+/* Continue button limit */
+document.addEventListener("DOMContentLoaded",()=>{
+  const btn=document.getElementById("continueCourseBtn");
+  if(btn){
+    btn.addEventListener("click",(e)=>{
+      let clicks = parseInt(btn.getAttribute("data-clicks"))||0;
+      if(clicks>=4){ e.preventDefault(); alert("🚫 You’ve reached the 4-time limit for continuing the course."); return; }
+      btn.setAttribute("data-clicks", clicks+1);
     });
-  });
+  }
 });
 
+/* ===== Main tab quiz (lazy build on first open) ===== */
+let quizLoaded = false;
+document.querySelector('[data-bs-target="#quiz"]')?.addEventListener('click', () => {
+  if (quizLoaded) return;
 
+  const tinyBar = document.getElementById("tinyLoadingBar");
+  const tinyFill = document.getElementById("tinyProgressFill");
+  const container = document.getElementById("mainQuizContainer");
 
+  if (tinyBar) {
+  tinyBar.style.display = "block";
+  tinyBar.classList.remove("active"); void tinyBar.offsetWidth; tinyBar.classList.add("active");
+}
 
-  const quizScript = document.getElementById("quiz-data");
-  if (quizScript) {
-    const quiz = JSON.parse(quizScript.textContent);
-    const container = document.getElementById("quiz-block");
-    let currentIndex = 0;
-    let score = 0;
+  container.innerHTML = "<p class='text-secondary'>Generating quiz…</p>";
 
-    const renderQuestion = () => {
-      if (!quiz.length) return;
-      const q = quiz[currentIndex];
-      let html = `<div class="card p-3"><h5>${q.question}</h5>`;
-      q.options.forEach((opt) => {
-        const letter = opt.trim().charAt(0);
-        html += `
-          <button class="btn btn-outline-primary btn-answer w-100 my-1"
-              onclick="checkAnswer(this, '${letter}', '${q.answer}')">
-              ${opt}
-          </button>`;
-      });
-      html += `
-        <div class="d-flex justify-content-between mt-2">
-          <button class="btn btn-info btn-sm" onclick="alert('How-to-solve coming soon!')">🧠 How to solve</button>
-          ${currentIndex < quiz.length - 1
-              ? `<button class="btn btn-secondary" onclick="nextQuestion()">Next</button>`
-              : `<button class="btn btn-success" onclick="showResults()">Finish</button>`}
-        </div>
-      </div>`;
-      container.innerHTML = html;
-    };
+  const dataEl = document.getElementById("jinja-data");
+  if (!dataEl) {
+    if (tinyBar) tinyBar.style.display = "none";
+    container.innerHTML = "<p>⚠️ Missing course data.</p>";
+    return;
+  }
+  const { subject, topics } = JSON.parse(dataEl.textContent);
 
-    window.checkAnswer = (btn, selected, correct) => {
-      const buttons = document.querySelectorAll('.btn-answer');
-      buttons.forEach(b => {
-        const bLetter = b.textContent.trim().charAt(0);
-        b.disabled = true;
-        b.classList.remove('btn-outline-primary');
-        if (bLetter === correct) {
-          b.classList.add('btn-success');
-          if (b === btn) score++;
-        } else if (b === btn) {
-          b.classList.add('btn-danger');
-        }
-      });
-    };
+  fetch("/generate_quiz", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ subject, topics })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (tinyBar) {
+  tinyBar.classList.remove("active");
+  tinyBar.style.display = "none";
+}
 
-    window.nextQuestion = () => {
-      if (currentIndex < quiz.length - 1) {
-        currentIndex++;
-        renderQuestion();
-      }
-    };
+    if (!Array.isArray(data.quiz)) { container.innerHTML = "<p>❌ Failed to load quiz. Please try again.</p>"; return; }
 
-    window.showResults = () => {
-      const percent = Math.round((score / quiz.length) * 100);
+    let i = 0, score = 0;
+
+    const render = () => {
+      const q = data.quiz[i]; if (!q) return;
+      const opts = (q.options || []).map(opt => {
+        const L = opt.trim().charAt(0);
+        return `<button class="btn btn-outline-light btn-answer w-100 my-1 text-start" data-letter="${L}">${opt}</button>`;
+      }).join("");
+      const nav = (i < data.quiz.length - 1)
+        ? `<button class="btn btn-secondary" data-action="next">Next</button>`
+        : `<button class="btn btn-acc" data-action="finish">Finish</button>`;
+
       container.innerHTML = `
-        <div class="card p-4 text-center">
-          <h4>✅ Quiz Complete!</h4>
-          <p>Your Score: ${score} / ${quiz.length}</p>
-          <p><strong>${percent}%</strong></p>
+        <div class="card glass p-3">
+          <h5>${q.question}</h5>
+          <div class="mt-3">${opts}</div>
+          <div class="d-flex justify-content-between mt-3">
+            <button class="btn btn-sm btn-outline-light" data-action="how">🧠 How to solve</button>
+            ${nav}
+          </div>
         </div>`;
     };
 
-    renderQuestion();
-  }
+    container.onclick = (e) => {
+      const btn = e.target.closest("button"); if (!btn) return;
+      const act = btn.getAttribute("data-action");
 
-</script>
-{% if output %}
-<script id="jinja-data" type="application/json">
-{
-  "subject": {{ output.subject | tojson }},
-  "topics": {{ output.topics | map(attribute='title') | list | tojson }}
-}
-</script>
-{% endif %}
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const continueBtn = document.getElementById("continueCourseBtn");
-
-    if (continueBtn) {
-      continueBtn.addEventListener("click", function () {
-        let clicks = parseInt(continueBtn.getAttribute("data-clicks")) || 0;
-
-        if (clicks >= 4) {
-          alert("🚫 You’ve reached the 4-time limit for continuing the course.");
-          return;
-        }
-
-        continueBtn.setAttribute("data-clicks", clicks + 1);
-        // Proceed with your normal generation logic (or trigger the form submit, etc.)
-      });
-    }
-  });
-</script>
-
-<script>
-
-let quizLoaded = false;
-
-document.querySelector('[data-bs-target="#quiz"]').addEventListener('click', function () {
-    if (quizLoaded) return;
-    const loadingInterval = showTinyLoadingBar();
-
-    
-
-    const container = document.getElementById("mainQuizContainer");
-    container.innerHTML = "<p>Generating quiz...</p>";
-
-    // Load JSON from hidden script
-    const jsonData = JSON.parse(document.getElementById("jinja-data").textContent);
-    const subject = jsonData.subject;
-    const topics = jsonData.topics;
-
-    fetch("/generate_quiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, topics })
-    })
-    .then(res => res.json())
-   .then(data => {
-    clearInterval(loadingInterval);
-    hideTinyLoadingBar();
-
-    if (data.quiz) {
-        let currentIndex = 0;
-        let score = 0;
-        
-        const renderQuestion = () => {
-            const q = data.quiz[currentIndex];
-            let html = `
-                <div class="card p-3">
-                    <h5>${q.question}</h5>
-                    <div class="mt-3">`;
-
-            q.options.forEach(opt => {
-                const letter = opt.trim().charAt(0);
-                html += `
-                <button class="btn btn-outline-primary btn-answer w-100 my-1"
-                    onclick="checkMainAnswer(this, '${letter}', '${q.answer}')">
-                    ${opt}
-                </button>`;
-            });
-
-            html += `</div>
-                <div class="d-flex justify-content-between mt-3">
-                    <button class="btn btn-sm btn-info" onclick="alert('🧠 How to solve coming soon!')">🧠 How to solve</button>
-                    ${currentIndex < data.quiz.length - 1
-                        ? `<button class="btn btn-secondary" onclick="nextMainQuestion()">Next</button>`
-                        : `<button class="btn btn-success" onclick="showMainResults()">Finish</button>`}
-                </div>
-            </div>`;
-
-            container.innerHTML = html;
-        };
-
-        window.checkMainAnswer = (btn, selected, correct) => {
-            const buttons = btn.parentNode.querySelectorAll('.btn-answer');
-            buttons.forEach(b => {
-                b.disabled = true;
-                const bLetter = b.textContent.trim().charAt(0);
-                b.classList.remove('btn-outline-primary');
-                if (bLetter === correct) {
-                    b.classList.add('btn-success');
-                    if (b === btn) score++;
-                } else if (b === btn) {
-                    b.classList.add('btn-danger');
-                }
-            });
-        };
-
-        window.nextMainQuestion = () => {
-            currentIndex++;
-            renderQuestion();
-        };
-
-        window.showMainResults = () => {
-  const percent = Math.round((score / data.quiz.length) * 100);
+      if (btn.classList.contains("btn-answer")) {
+        const corr = (data.quiz[i].answer || "").trim().charAt(0);
+        const all = [...container.querySelectorAll(".btn-answer")];
+        all.forEach(b => {
+          const L = b.dataset.letter;
+          b.disabled = true;
+          b.classList.remove("btn-outline-light");
+          if (L === corr) b.classList.add("btn-success");
+          else if (b === btn) b.classList.add("btn-danger");
+        });
+        if (btn.dataset.letter === corr) score++;
+        return;
+      }
+      if (act === "next") { i++; render(); return; }
+      if (act === "finish") {
+  const pct = Math.round((score / data.quiz.length) * 100);
   container.innerHTML = `
-    <div class="card p-4 text-center">
+    <div class="card glass p-4 text-center quiz-result">
       <h4>✅ Quiz Complete!</h4>
-      <p>Your Score: ${score} / ${data.quiz.length}</p>
-      <p><strong>${percent}%</strong></p>
+      <p class="result-text">Your Score: ${score} / ${data.quiz.length} (${pct}%)</p>
+
       <div class="d-flex justify-content-center gap-2 mt-3">
-        <button class="btn btn-outline-primary" onclick="retryMainQuiz()">🔁 Retry Quiz</button>
-        <button class="btn btn-outline-danger" onclick="regenerateMainQuiz()">♻️ Regenerate Quiz</button>
+        <button class="btn btn-outline-light" data-action="retry">🔁 Retry</button>
+        <button class="btn btn-acc" data-action="regen">♻️ Regenerate</button>
       </div>
     </div>`;
-};
+  return;
+}
 
-window.retryMainQuiz = () => {
-  currentIndex = 0;
-  score = 0;
-  renderQuestion();
-};
+      if (act === "retry") { i = 0; score = 0; render(); return; }
+      if (act === "regen") { quizLoaded = false; document.querySelector('[data-bs-target="#quiz"]').click(); return; }
+      if (act === "how") { alert("🧠 How to solve coming soon!"); return; }
+    };
 
-window.regenerateMainQuiz = () => {
-  quizLoaded = false;
-  document.querySelector('[data-bs-target="#quiz"]').click();
-};
-
-
-        renderQuestion();
-        quizLoaded = true;
-    } else {
-        container.innerHTML = "<p>❌ Failed to load quiz. Please try again.</p>";
-    }
-
-
-
-})
-.catch(error => {
-    console.error("Quiz generation failed:", error);
-    clearInterval(loadingInterval);
-    hideTinyLoadingBar();
-    container.innerHTML = "<p>❌ An error occurred while generating quiz. Please try again.</p>";
+    render();
+    quizLoaded = true;
+  })
+  .catch(err => {
+    console.error(err);
+    if (tinyBar) tinyBar.style.display = "none";
+    container.innerHTML = "<p>❌ Error generating quiz.</p>";
+  });
 });
-});
-document.getElementById("continue-form")?.addEventListener("submit", function (e) {
-  showTinyLoadingBar();
-});
-
 </script>
-
-<div id="tinyLoadingBar">
-  <div id="tinyProgressFill"></div>
-</div>
 </body>
 </html>

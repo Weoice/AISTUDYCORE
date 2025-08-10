@@ -2,400 +2,238 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Upload Document</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Upload Document — StudyCore</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background: #040303;
-      color: white;
-      text-align: center;
-      padding-top: 50px;
+    body { background:#0b0f17; color:#e5e7eb; }
+    .nav-glass { background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.2)); backdrop-filter: blur(10px); }
+    .dropzone { border:2px dashed rgba(255,255,255,.25); border-radius:18px; padding:60px 16px; text-align:center; background: rgba(255,255,255,.05); transition:.2s; }
+    .dropzone.drag { border-color:#6ee7ff; box-shadow: 0 0 0 4px rgba(110,231,255,.12) inset; }
+    .glass { background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); border-radius:16px; }
+    .btn-acc { background: linear-gradient(90deg, #7c3aed, #6ee7ff); border:none; color:#0b0f17 !important; font-weight:700; }
+
+    /* Flashcards (high contrast) */
+    .flashcard{ width:320px; height:200px; margin:20px auto; perspective:1000px; cursor:pointer; }
+    .flashcard .inner{ position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform .65s; }
+    .flashcard.flipped .inner{ transform: rotateY(180deg); }
+    .flashcard .face{
+      position:absolute; inset:0; backface-visibility:hidden;
+      display:flex; align-items:center; justify-content:center;
+      border-radius: 14px; padding: 18px;
+      background: linear-gradient(180deg, #1b2230, #0f1522);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 12px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+      color: #e8f0ff; font-size: 1.05rem; font-weight: 700; text-align:center;
     }
-    .upload-box {
-      border: 2px dashed #aaa;
-      border-radius: 10px;
-      padding: 60px;
-      margin: 0 auto 30px;
-      width: 60%;
-      background: #1e1e1e;
-      color: #ccc;
-    }
-    .upload-box:hover {
-      border-color: #00bcd4;
-      color: #00bcd4;
-    }
-    .upload-btns .btn {
-      margin: 10px;
-    }
-    .hidden { display: none; }
+    .flashcard .back{ transform: rotateY(180deg); background: linear-gradient(180deg, #101826, #0b1220); color:#fff; font-weight:600; }
 
-    .flashcard-flip {
-  perspective: 1000px;
-  width: 300px;
-  height: 180px;
-  margin: 20px auto;
-  cursor: pointer;
-}
-.flashcard-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-}
-.flashcard-flip:hover .flashcard-inner {
-  transform: rotateY(180deg);
-}
-.flashcard-front, .flashcard-back {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: #1e1e1e;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  padding: 20px;
-  backface-visibility: hidden;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  text-align: center;
-}
-.flashcard-back {
-  transform: rotateY(180deg);
-}
-.quiz-option-btn {
-  background-color: #222;
-  color: white;
-  border: 1px solid #00bcd4;
-  
-}
-.quiz-option-btn:hover {
-  background-color: #00bcd4;
-  color: black;
-}
-.dark-box {
-  background-color: #1e1e1e;
-  color: #fff;
-  border: 1px solid #444;
-}
+    /* Study guide contrast */
+    .sg-title{ color:#EAF2FF !important; font-weight:800; }
+    .sg-summary{ color:#CFE3FF !important; opacity:1 !important; }
 
-.correct {
-  background-color: #28a745 !important; /* green */
-  color: white;
-}
-.incorrect {
-  background-color: #dc3545 !important; /* red */
-  color: white;
-}
+    /* Upload results contrast (questions, headings, strong) */
+    #results .card.glass h5,
+    #results .card.glass h4,
+    #results .card.glass strong{ color:#F6FAFF !important; }
 
-
-
-
-
-
-
-
+    /* Score line always bright */
+    .quiz-score-text{ color:#EAF2FF !important; font-weight:700; opacity:1 !important; }
   </style>
 </head>
 <body>
-
-
-<nav class="navbar navbar-dark bg-dark justify-content-between px-4">
-  <a class="navbar-brand text-white" href="/" >Course Generator</a>
-  <div>
-    <b><a href="/upload" class="btn btn-outline-light me-2">📤 Upload Document</a></div></b>
-    <button class="btn btn-outline-info">Login</button>
+<nav class="navbar navbar-expand-lg nav-glass sticky-top px-3">
+  <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+    <img src="{{ url_for('static', filename='Sattys.png') }}" alt="StudyCore logo" width="28" height="28" class="rounded-circle" style="box-shadow:0 0 0 2px rgba(255,255,255,.12);">
+    <span style="font-weight:900;background:linear-gradient(90deg,#fff,#a5f3fc 55%,#c4b5fd 90%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">
+      Study<span style="filter:drop-shadow(0 0 8px rgba(124,58,237,.45))">Core</span>
+    </span>
+  </a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/upload" class="btn btn-sm btn-outline-light">Upload</a>
+    <a href="#" class="btn btn-sm btn-acc">Login</a>
   </div>
 </nav>
 
+<div class="container py-5">
+  <h2 class="text-center fw-bold">📄 Upload Your Study Document</h2>
+  <p class="text-center text-secondary">PDF, TXT, DOC, DOCX supported</p>
 
-<h2 class="my-4">📄 Upload Your Study Document</h2>
-
-<div class="upload-box" id="drop-area">
-  <input type="file" id="docUpload" accept=".pdf,.txt,.doc,.docx" hidden />
-  <label for="docUpload" class="btn btn-outline-info btn-lg">📤 Drag & Drop or Click to Upload</label>
-</div>
-
-<p id="upload-status" style="color: #00bcd4; margin-bottom: 20px;"></p>
-
-<div class="upload-btns">
-  <form action="/flashcards/{{ output.subject }}" method="get" style="display: inline;">
-  <button class="btn btn-outline-light">Flashcards</button>
-</form>
-
-  <button class="btn btn-outline-light" onclick="submitDoc('quiz')">Generate Quiz</button>
-
-  <div id="quizResults" class="mt-4 p-3 rounded shadow-sm dark-box"></div>
-
-
-  <button class="btn btn-outline-light" id="studyBtn" onclick="submitDoc('studyguide')">Generate Study Guide</button>
-</div>
-<div id="loadingSpinner" class="text-info my-3" style="display: none;">
-  <div class="spinner-border text-info" role="status">
-    <span class="visually-hidden">Loading...</span>
+  <div class="dropzone my-4" id="drop-area">
+    <input type="file" id="docUpload" accept=".pdf,.txt,.doc,.docx" hidden />
+    <label for="docUpload" class="btn btn-acc">📤 Click to Select</label>
+    <p class="mt-3" id="upload-status"></p>
   </div>
-  <p>Generating, please wait...</p>
+
+  <div class="d-flex justify-content-center gap-2">
+    <button class="btn btn-outline-light" onclick="submitDoc('flashcards')">Generate Flashcards</button>
+    <button class="btn btn-outline-light" onclick="submitDoc('quiz')">Generate Quiz</button>
+    <button class="btn btn-outline-light" onclick="submitDoc('studyguide')">Generate Study Guide</button>
+  </div>
+
+  <div id="loadingSpinner" class="text-info my-4 text-center" style="display:none;">
+    <div class="spinner-border text-info" role="status"></div>
+    <p class="mt-2">Generating, please wait…</p>
+  </div>
+
+  <div id="results" class="mt-4"></div>
 </div>
-
-  
-
 
 <script>
-function submitDoc(type) {
-  const fileInput = document.getElementById('docUpload');
-  if (!fileInput.files[0]) return alert("Please upload a document first.");
+"use strict";
 
+function submitDoc(type){
+  const f = document.getElementById('docUpload');
+  if(!f.files || !f.files[0]) return alert("Please upload a document first.");
   const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
+  formData.append("file", f.files[0]);
 
-  
   document.getElementById("loadingSpinner").style.display = "block";
+  const results = document.getElementById("results");
+  results.innerHTML = "";
 
- 
-  document.querySelectorAll(".dynamic-output")?.forEach(el => el.remove());
+  fetch(`/generate_${type}_from_doc`, { method:'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("loadingSpinner").style.display = "none";
+      const c = document.createElement("div");
+      c.className = "glass p-3";
+      if(type==="flashcards" && data.flashcards){ renderFlashcards(c, data.flashcards); }
+      else if(type==="quiz" && data.quiz){ renderDocQuiz(c, data.quiz); }
+      else if(type==="studyguide" && data.studyguide){ renderStudyGuide(c, data.studyguide); }
+      else { c.innerHTML = `<p class="text-danger">❌ Failed: ${data.error || "Unknown error"}</p>`; }
+      results.appendChild(c);
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("loadingSpinner").style.display = "none";
+      alert("Error generating "+type);
+    });
+}
 
-  fetch(`/generate_${type}_from_doc`, {
-    method: 'POST',
-    body: formData
-  })
-  
-  .then(res => res.json())
-  .then(data => {
-    
-    document.getElementById("loadingSpinner").style.display = "none";
-
-    
-
-
-    const container = document.createElement("div");
-    container.classList.add("dynamic-output");
-    document.body.appendChild(container);
-    container.style.marginTop = "30px";
-    container.style.padding = "20px";
-    container.style.background = "#222";
-    container.style.borderRadius = "10px";
-    container.style.maxWidth = "700px";
-    container.style.marginLeft = "auto";
-    container.style.marginRight = "auto";
-
-    // 🔁 Flashcard rendering
-    if (type === "flashcards" && data.flashcards) {
-      let flashcards;
-      try {
-        flashcards = typeof data.flashcards === "string"
-          ? JSON.parse(data.flashcards)
-          : data.flashcards;
-      } catch (err) {
-        container.innerHTML = "<p style='color: red;'>❌ Failed to parse flashcards JSON.</p>";
-        document.body.appendChild(container);
-        return;
-      }
-
-      let currentCard = 0;
-
-      const renderFlashcard = () => {
-        const fc = flashcards[currentCard];
-        container.innerHTML = `
-          <h4 class="mb-3">🃏 Flashcards</h4>
-          <div class="flashcard-flip" onclick="flipCard()">
-            <div class="flashcard-inner" id="card-inner">
-              <div class="flashcard-front"><strong>${fc.term}</strong></div>
-              <div class="flashcard-back">${fc.definition}</div>
-            </div>
-          </div>
-          <div class="mt-3">
-            <button class="btn btn-outline-light me-2" onclick="prevCard()">⬅️ Prev</button>
-            <button class="btn btn-outline-light" onclick="nextCard()">➡️ Next</button>
-            <p class="mt-2">Card ${currentCard + 1} of ${flashcards.length}</p>
-          </div>
-        `;
-      };
-
-      window.flipCard = () => {
-        const card = document.getElementById("card-inner");
-        card.classList.toggle("flipped");
-      };
-
-      window.prevCard = () => {
-        if (currentCard > 0) {
-          currentCard--;
-          renderFlashcard();
-        }
-      };
-
-      window.nextCard = () => {
-        if (currentCard < flashcards.length - 1) {
-          currentCard++;
-          renderFlashcard();
-        }
-      };
-
-      renderFlashcard();
-    }
-
-    // 📝 Quiz rendering
-    else if (type === "quiz") {
-      let quiz;
-      try {
-        quiz = typeof data.quiz === "string"
-          ? JSON.parse(data.quiz)
-          : data.quiz;
-
-        if (!Array.isArray(quiz)) throw new Error("Quiz is not an array");
-      } catch (err) {
-        console.error("❌ Quiz parsing failed:", err);
-        container.innerHTML = "<p style='color: red;'>❌ Failed to parse quiz content.</p>";
-        
-        return;
-      }
-
-      let currentIndex = 0;
-      let score = 0;
-
-      const renderQuestion = () => {
-        const q = quiz[currentIndex];
-        container.innerHTML = `
-          <h4 class="mb-3">📝 Quiz</h4>
-          <div class="card p-3">
-            <h5>${q.question}</h5>
-            <div class="mt-3" id="options-block"></div>
-            <div class="d-flex justify-content-between mt-3">
-              <button class="btn btn-info btn-sm" onclick="alert('🧠 How to solve coming soon!')">🧠 How to solve</button>
-              ${
-                currentIndex < quiz.length - 1
-                  ? `<button class="btn btn-secondary" onclick="nextDocQuiz()">Next</button>`
-                  : `<button class="btn btn-success" onclick="showDocQuizResults()">Finish</button>`
-              }
-            </div>
-          </div>
-        `;
-
-        const optBlock = container.querySelector("#options-block");
-
-        q.options.forEach(opt => {
-          const btn = document.createElement("button");
-          btn.className = "btn btn-outline-dark btn-sm w-100 my-2";
-
-
-          btn.textContent = opt;
-          btn.onclick = () => {
-  const selectedLetter = btn.textContent.trim().charAt(0); // e.g. "C"
-  const correctLetter = q.answer.trim().charAt(0);
-
-  if (selectedLetter === correctLetter) {
-    btn.classList.add("correct");
-    score++;
-  } else {
-    btn.classList.add("incorrect");
+function renderFlashcards(container, cards){
+  let idx = 0;
+  container.innerHTML = `
+    <h4>🃏 Flashcards</h4>
+    <div class="flashcard" id="fc">
+      <div class="inner">
+        <div class="face"><strong id="fc-front"></strong></div>
+        <div class="face back"><span id="fc-back"></span></div>
+      </div>
+    </div>
+    <div class="text-center">
+      <button class="btn btn-outline-light me-2" id="prev">⬅️ Prev</button>
+      <button class="btn btn-outline-light" id="next">➡️ Next</button>
+      <p class="mt-2" id="fc-count"></p>
+    </div>`;
+  const fc = container.querySelector("#fc");
+  const front = container.querySelector("#fc-front");
+  const back = container.querySelector("#fc-back");
+  const count = container.querySelector("#fc-count");
+  function load(i){
+    const card = cards[i] || {};
+    front.textContent = card.term || "—";
+    back.textContent = card.definition || "—";
+    count.textContent = `Card ${i+1} of ${cards.length}`;
   }
+  fc.addEventListener("click", ()=> fc.classList.toggle("flipped"));
+  container.querySelector("#prev").addEventListener("click", ()=>{ idx=Math.max(0,idx-1); fc.classList.remove("flipped"); load(idx); });
+  container.querySelector("#next").addEventListener("click", ()=>{ idx=Math.min(cards.length-1,idx+1); fc.classList.remove("flipped"); load(idx); });
+  load(0);
+}
 
-  // Show the correct one
-  Array.from(optBlock.children).forEach(b => {
-    b.disabled = true;
-    if (b.textContent.trim().charAt(0) === correctLetter) {
-      b.classList.add("correct");
-    }
-  });
-};
+function renderDocQuiz(container, quiz){
+  if(!Array.isArray(quiz) || !quiz.length){
+    container.innerHTML = `<p class="text-warning">No quiz questions returned.</p>`;
+    return;
+  }
+  let i=0, score=0;
 
+  const draw = ()=>{
+    const q = quiz[i];
+    let html = `<h4>📝 Quiz</h4>
+      <div class="card glass p-3">
+        <h5>${q.question}</h5>
+        <div class="mt-3">`;
+    (q.options||[]).forEach(opt=>{
+      const L = opt.trim().charAt(0);
+      html += `<button class="btn btn-outline-light w-100 my-1 text-start btn-answer" data-letter="${L}">${opt}</button>`;
+    });
+    html += `</div>
+      <div class="d-flex justify-content-end mt-3">
+        ${i<quiz.length-1 ? `<button class="btn btn-secondary" id="next">Next</button>`:`<button class="btn btn-acc" id="finish">Finish</button>`}
+      </div></div>`;
+    container.innerHTML = html;
 
-
-          optBlock.appendChild(btn);
+    // answer handlers
+    container.querySelectorAll(".btn-answer").forEach(b=>{
+      b.addEventListener("click", ()=>{
+        const sel = b.dataset.letter;
+        const corr = (q.answer||"").trim().charAt(0);
+        container.querySelectorAll(".btn-answer").forEach(x=>{
+          x.disabled = true;
+          const L = x.dataset.letter;
+          x.classList.remove("btn-outline-light");
+          if(L===corr) x.classList.add("btn-success");
+          else if(x===b) x.classList.add("btn-danger");
         });
-      };
+        if(sel===corr) score++;
+      });
+    });
 
-      window.nextDocQuiz = () => {
-        currentIndex++;
-        renderQuestion();
-      };
+    // nav handlers
+    const nextBtn = container.querySelector("#next");
+    if(nextBtn) nextBtn.addEventListener("click", ()=>{ i++; draw(); });
 
-      window.showDocQuizResults = () => {
-        const percent = Math.round((score / quiz.length) * 100);
-        container.innerHTML = `
-          <div class="quiz-result-box text-center p-4">
-            <h4>✅ Quiz Complete!</h4>
-            <p>Your Score: ${score} / ${quiz.length}</p>
-            <p><strong>${percent}%</strong></p>
+    const fin = container.querySelector("#finish");
+    if (fin) fin.addEventListener("click", () => {
+      const pct = Math.round((score / quiz.length) * 100);
+      container.innerHTML = `
+        <div class="card glass p-4 text-center">
+          <h4>✅ Quiz Complete!</h4>
+          <p class="quiz-score-text">Your Score: ${score} / ${quiz.length} (${pct}%)</p>
+          <div class="d-flex justify-content-center mt-3">
+            <button class="btn btn-outline-light" id="retryDocQuiz">🔁 Retry</button>
           </div>
-`;
+        </div>`;
+      container.querySelector("#retryDocQuiz").addEventListener("click", ()=>{ i=0; score=0; draw(); });
+    });
+  };
 
-      };
-
-      renderQuestion();
-    }
-
-    // ❌ Fallback for unrecognized or empty result
-    else {
-      container.innerHTML = "<p style='color: red;'>❌ Failed to generate content.</p>";
-    }
-
-    document.body.appendChild(container);
-  })
-  fetch(`/generate_${type}_from_doc`, {
-  method: 'POST',
-  body: formData
-})
-.then(res => res.json())
-.then(data => {
-  document.getElementById("loadingSpinner").style.display = "none";
-
-  // ... your rendering logic (quiz, flashcards, etc.)
-})
-.catch(err => {
-  document.getElementById("loadingSpinner").style.display = "none";
-  console.error("❌ Error during generation:", err);
-  alert("Error generating " + type);
-});
-
+  draw();
 }
 
+function renderStudyGuide(container, topics){
+  let html = `<h4>📚 Extracted Study Guide</h4>`;
+  topics.forEach(t=>{
+    html += `<div class="card glass p-3 mb-2">
+      <h6 class="fw-bold sg-title">${t.title}</h6>
+      <p class="mb-1 sg-summary">${t.summary || ""}</p>
+      ${t.video ? `<a class="btn btn-sm btn-acc w-100" target="_blank" href="${t.video}">Watch video ↗</a>` : ""}
+    </div>`;
+  });
+  container.innerHTML = html;
+}
 
-
-
-
+// Drag & drop
 const dropArea = document.getElementById('drop-area');
-dropArea.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropArea.classList.add("border-primary");
-});
-dropArea.addEventListener("dragleave", () => {
-  dropArea.classList.remove("border-primary");
-});
-dropArea.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropArea.classList.remove("border-primary");
-
-  const droppedFiles = e.dataTransfer.files;
-  if (droppedFiles.length > 0) {
-    const fileInput = document.getElementById("docUpload");
-const dataTransfer = new DataTransfer();
-for (let file of e.dataTransfer.files) {
-  dataTransfer.items.add(file);
-}
-fileInput.files = dataTransfer.files;
-document.getElementById("upload-status").textContent = "✅ Uploaded: " + fileInput.files[0].name;
-
-const msg = document.createElement("p");
-msg.id = "docStatus";
-msg.innerText = "✅ Document uploaded: " + fileInput.files[0].name;
-msg.style.color = "#00ffcc";
-dropArea.appendChild(msg);
-
-console.log("Dropped file:", fileInput.files[0]);
-
-    console.log("Dropped file:", droppedFiles[0]);
+dropArea.addEventListener("dragover", e=>{ e.preventDefault(); dropArea.classList.add("drag"); });
+dropArea.addEventListener("dragleave", ()=> dropArea.classList.remove("drag"));
+dropArea.addEventListener("drop", (e)=>{
+  e.preventDefault(); dropArea.classList.remove("drag");
+  const files = e.dataTransfer.files;
+  if(files.length){
+    const input = document.getElementById("docUpload");
+    const dt = new DataTransfer();
+    Array.from(files).forEach(f=>dt.items.add(f));
+    input.files = dt.files;
+    document.getElementById("upload-status").textContent = "✅ Uploaded: " + input.files[0].name;
   }
 });
-
-document.getElementById("docUpload").addEventListener("change", function () {
+document.getElementById("docUpload").addEventListener("change", function(){
   const name = this.files[0]?.name || "None";
   document.getElementById("upload-status").textContent = "✅ Uploaded: " + name;
 });
-
-
 </script>
-
 </body>
 </html>

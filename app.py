@@ -1,101 +1,146 @@
-from flask import Flask, render_template, request
-from youtubesearchpython import VideosSearch
-import json
-import os
-from dotenv import load_dotenv
-load_dotenv(override=True)
-from flask import Flask, request, render_template, jsonify
+import os, re, json
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+from openai import OpenAI
 
-load_dotenv()
-
-print("KEY LOADED:", os.getenv("OPENAI_API_KEY"))
-
+load_dotenv(override=True)
 
 app = Flask(__name__)
-from openai import OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def search_youtube(topic):
+# ---------- Safe JSON extraction (no eval) ----------
+JSON_ARRAY_RE = re.compile(r"\[\s*(?:\{.*?\}\s*,\s*)*\{.*?\}\s*\]", re.S)
+JSON_OBJECT_RE = re.compile(r"\{\s*\"[^\"]+\"\s*:\s*.*\}", re.S)
+
+def parse_json_strict(text, want="array"):
+    text = (text or "").strip()
+    m = JSON_ARRAY_RE.search(text) if want == "array" else JSON_OBJECT_RE.search(text)
+    if m:
+        return json.loads(m.group(0))
+    return json.loads(text)
+
+# ---------- YouTube search: whole-unit/whole-topic review ----------
+def search_youtube_precise(subject, topic_title):
+    """
+    Prefer: AP -> 'AP <subject> Unit N review' matches.
+            Normal -> '<topic> unit/chapter/full review' matches.
+    Returns first strong match, else first result, else "".
+    """
     from youtubesearchpython import VideosSearch
 
-    # Refined query: encourage longer/better videos
-    search_query = f"{topic} full lesson OR review OR summary"
+    ap = bool(re.search(r"\bap\b", (subject or "").lower()))
+    unit_num = None
+    m = re.search(r"\bunit\s*(\d+)\b", (topic_title or "").lower())
+    if m:
+        unit_num = int(m.group(1))
 
-    results = VideosSearch(search_query, limit=5).result()["result"]
+    if ap and unit_num:
+        subj_core = re.sub(r"\bap\b", "", subject, flags=re.I).strip()
+        queries = [
+            f"AP {subj_core} Unit {unit_num} review",
+            f"AP {subj_core} Unit {unit_num} full review",
+            f"AP {subj_core} Unit {unit_num} exam review",
+            f"AP {subj_core} Unit {unit_num} summary",
+        ]
+    else:
+        queries = [
+            f"{topic_title} unit review",
+            f"{topic_title} chapter review",
+            f"{topic_title} full review",
+            f"{subject} {topic_title} review",
+            f"{subject} {topic_title} summary",
+        ]
 
-    # Define preferred filters
-    preferred_keywords = ["unit review", "unit summary", "unit", "chapter", "full", "complete", "highschool"]
-    excluded_keywords = ["intro", "basic", "easy", "kindergarten", "middle school"]
+    def strong_match(results):
+        for v in results:
+            title = (v.get("title") or "").lower()
+            link = v.get("link") or ""
+            if not link:
+                continue
+            if ap and unit_num is not None:
+                if re.search(rf"\bunit\s*{unit_num}\b", title) and "review" in title:
+                    return link
+            else:
+                if ("review" in title) and ("unit" in title or "chapter" in title or "full" in title or "complete" in title):
+                    return link
+        return ""
 
-    for video in results:
-        title = video["title"].lower()
-        if any(p in title for p in preferred_keywords) and not any(e in title for e in excluded_keywords):
-            return video["link"]
+    last_seen = ""
+    for q in queries:
+        try:
+            res = VideosSearch(q, limit=8).result().get("result", [])
+        except Exception:
+            continue
+        link = strong_match(res)
+        if link:
+            return link
+        if res:
+            last_seen = res[0].get("link") or last_seen
 
-    # fallback
-    return results[0]["link"] if results else ""
-
+    if last_seen:
+        return last_seen
+    try:
+        res = VideosSearch(f"{subject} {topic_title}", limit=1).result().get("result", [])
+        return res[0]["link"] if res else ""
+    except Exception:
+        return ""
 
 def search_extra_videos(subject):
-    results = VideosSearch(f"{subject} simplified", limit=3).result()["result"]
-    return [{"title": v["title"], "link": v["link"]} for v in results]
+    from youtubesearchpython import VideosSearch
+    try:
+        res = VideosSearch(f"{subject} review", limit=6).result().get("result", [])
+        return [{"title": v.get("title"), "link": v.get("link")} for v in res][:6]
+    except Exception:
+        return []
+
+# ---------------------------------- ROUTES ---------------------------------- #
 
 @app.route("/", methods=["GET", "POST"])
 def home():
     output = None
     if request.method == "POST":
-        subject = request.form.get("subject", "")
+        subject = request.form.get("subject", "").strip()
         past_titles = request.form.getlist("past_topics")
-        total_lessons_done = len(past_titles)
+        total_done = len(past_titles)
 
         if past_titles:
             learned = "\n".join([f"- {t}" for t in past_titles])
             prompt = f"""
-You are designing a course on \"{subject}\".
-The user has already learned:
+You are designing a course on "{subject}".
+They already learned:
 {learned}
 
-Now generate 3 new structured beginner-level lessons.
-Each lesson should be a dictionary like this:
-{{"title": "...", "description": "..."}}
-Return a Python list like this:
-[
-  {{"title": "...", "description": "..."}},
-  ...
-]"""
+Now generate 3 new beginner-friendly lessons by unit or key topic.
+If AP, use official AP unit names (e.g., "Unit 3: Cultural Patterns and Processes").
+Return ONLY JSON array: [{{"title":"...","description":"..."}}, ...]
+"""
         else:
             prompt = f"""
-Create the first 3 beginner lessons for a course on \"{subject}\".
-Each lesson should be a dictionary like this:
-{{"title": "...", "description": "..."}}
-Return a Python list like this:
-[
-  {{"title": "...", "description": "..."}},
-  ...
-]"""
+Create the first 3 beginner lessons for "{subject}" (by unit or key topic).
+If AP, use official AP unit names.
+Return ONLY JSON array: [{{"title":"...","description":"..."}}, ...]
+"""
 
-        response = client.chat.completions.create(
+        # Use your known‑working model
+        resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role":"user","content":prompt}]
         )
-
         try:
-            new_lessons = eval(response.choices[0].message.content.strip())
-            if not isinstance(new_lessons, list):
-                raise ValueError("Bad format")
-        except:
+            new_lessons = parse_json_strict(resp.choices[0].message.content, want="array")
+        except Exception:
             return render_template("index.html", output={
                 "subject": subject,
                 "topics": [],
                 "error": "❌ GPT failed to generate lessons. Please try again."
             })
 
-        structured_past = []
-
+        # keep old lessons if continuing
+        structured = []
         for i, pt in enumerate(past_titles):
             description = request.form.getlist("past_descriptions")[i] if request.form.getlist("past_descriptions") else ""
             video = request.form.getlist("past_videos")[i] if request.form.getlist("past_videos") else ""
@@ -104,103 +149,100 @@ Return a Python list like this:
                 quiz = json.loads(quiz_json)
             except:
                 quiz = []
-            structured_past.append({
-                "title": pt if pt.startswith("Lesson") else f"Lesson {i + 1}: {pt}",
+            structured.append({
+                "title": pt if pt.lower().startswith("lesson") else f"Lesson {i+1}: {pt}",
                 "description": description,
                 "video": video,
                 "quiz": quiz
             })
 
+        # new lessons + videos + mini‑quizzes
         for i, lesson in enumerate(new_lessons):
-            lesson_number = total_lessons_done + i + 1
-            title = lesson["title"]
-            description = lesson["description"]
-            video = search_youtube(f"{subject} - {title}")
+            n = total_done + i + 1
+            title = lesson.get("title", f"Lesson {n}")
+            description = lesson.get("description", "")
+            video = search_youtube_precise(subject, title)
 
             quiz_prompt = f"""
-Create 2 multiple choice questions for a lesson titled: \"{title}\".
-Format as a Python list like this:
+Create 2 specific multiple choice questions for "{title}" ({subject}).
+Return ONLY JSON array:
 [
   {{
-    'question': '...',
-    'options': ['A) ...', 'B) ...', 'C) ...', 'D) ...'],
-    'answer': 'B'
+    "question": "...",
+    "options": ["A) ...","B) ...","C) ...","D) ..."],
+    "answer": "B"
   }},
-  ...
+  {{
+    "question": "...",
+    "options": ["A) ...","B) ...","C) ...","D) ..."],
+    "answer": "C"
+  }}
 ]
 """
-            quiz_response = client.chat.completions.create(
+            quiz_resp = client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": quiz_prompt}]
+                messages=[{"role":"user","content":quiz_prompt}]
             )
-
             try:
-                quiz = eval(quiz_response.choices[0].message.content.strip())
+                quiz = parse_json_strict(quiz_resp.choices[0].message.content, want="array")
             except:
                 quiz = []
 
-            structured_past.append({
-                "title": f"Lesson {lesson_number}: {title}" if not title.startswith("Lesson") else title,
+            structured.append({
+                "title": f"Lesson {n}: {title}" if not title.lower().startswith("lesson") else title,
                 "description": description,
                 "video": video,
                 "quiz": quiz
             })
 
         all_quiz = []
-        for item in structured_past:
-            if "quiz" in item:
+        for item in structured:
+            if isinstance(item.get("quiz"), list):
                 all_quiz.extend(item["quiz"])
-
-        extra_videos = search_extra_videos(subject)
 
         output = {
             "subject": subject,
-            "topics": structured_past,
+            "topics": structured,
             "quiz": all_quiz,
-            "videos": extra_videos,
-            "channel": f"CrashCourse or Khan Academy for {subject}",
-            "plan": f"This course contains {len(structured_past)} lessons to help you master {subject}."
+            "videos": search_extra_videos(subject),
+            "channel": f"CrashCourse / Khan Academy (auto-picked)",
+            "plan": f"This course contains {len(structured)} lessons."
         }
 
     return render_template("index.html", output=output)
-from flask import jsonify
 
 @app.route("/generate_quiz", methods=["POST"])
 def generate_quiz():
-    from openai import OpenAI
-    import os
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    data = request.get_json(force=True, silent=True) or {}
+    subject = data.get("subject", "")
+    all_titles = data.get("topics", [])
 
-    subject = request.json.get("subject", "")
-    all_titles = request.json.get("topics", [])
-
-    prompt = f"""Generate 10 multiple choice questions for a course on "{subject}" that covers the following lessons:\n"""
-    for t in all_titles:
-        prompt += f"- {t}\n"
-    prompt += """
-Each question should be extremely specific and challenging that will test thier full understnading of the subject, if math, give questions that take time to solve and are specific. Format like this:
+    prompt = f"""Generate 10 specific multiple choice questions for "{subject}" covering:
+""" + "\n".join(f"- {t}" for t in all_titles) + """
+Return ONLY JSON array:
 [
   {
     "question": "...",
-    "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+    "options": ["A) ...","B) ...","C) ...","D) ..."],
     "answer": "C"
-  },
+  }
   ...
 ]
 """
-
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role":"user","content":prompt}]
+    )
     try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        quiz = eval(response.choices[0].message.content.strip())
+        quiz = parse_json_strict(response.choices[0].message.content, want="array")
         return jsonify({"quiz": quiz})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-@app.route('/upload', methods=['GET', 'POST'])
+
+@app.route("/upload", methods=["GET"])
 def upload():
     return render_template("upload.html")
+
 @app.route("/generate_<task>_from_doc", methods=["POST"])
 def generate_from_doc(task):
     file = request.files.get("file")
@@ -213,135 +255,131 @@ def generate_from_doc(task):
     file.save(filepath)
 
     if ext == "pdf":
-        import PyPDF2
-        reader = PyPDF2.PdfReader(filepath)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
+        try:
+            import PyPDF2
+            reader = PyPDF2.PdfReader(filepath)
+            text = "".join(page.extract_text() or "" for page in reader.pages)
+        except Exception:
+            text = ""
     else:
-        text = file.read().decode("utf-8", errors="ignore")
+        try:
+            with open(filepath, "rb") as f:
+                text = f.read().decode("utf-8", errors="ignore")
+        except Exception:
+            text = ""
 
     if not text.strip():
         return jsonify({"error": "File is empty or unreadable"}), 400
 
     try:
         if task == "flashcards":
-            prompt = f"Create 10 flashcards in this JSON format:\n[\n{{\"term\": \"...\", \"definition\": \"...\"}},\n...]\n\nContent:\n{text[:3000]}"
-            messages = [{"role": "user", "content": prompt}]
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=messages)
-            raw = response.choices[0].message.content.strip()
-            print("\n📘 RAW FLASHCARDS OUTPUT:\n", raw)
-
-            flashcards = json.loads(raw)
+            prompt = f"""Create 12 concise flashcards from the content below.
+Return ONLY JSON array: [{{"term":"...","definition":"..."}}, ...]
+CONTENT:
+{text[:3500]}"""
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role":"user","content":prompt}]
+            )
+            flashcards = parse_json_strict(response.choices[0].message.content, want="array")
             return jsonify({"flashcards": flashcards})
 
         elif task == "quiz":
-            prompt = f"""Create 10 specific and challenging multiple-choice questions in JSON format like:
+            prompt = f"""Create 10 specific multiple-choice questions from the content below.
+Return ONLY JSON array:
 [
   {{
-    "question": "...",
-    "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
-    "answer": "B"
+    "question":"...",
+    "options":["A) ...","B) ...","C) ...","D) ..."],
+    "answer":"B"
   }},
   ...
 ]
-Content:\n{text[:3000]}"""
-
-            messages = [{"role": "user", "content": prompt}]
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=messages)
-            raw = response.choices[0].message.content.strip()
-            print("\n🟦 RAW QUIZ OUTPUT:\n", raw)
-
-            import re
-            json_match = re.search(r"\[.*\]", raw, re.DOTALL)
-            if not json_match:
-                return jsonify({"error": "❌ Could not extract JSON from GPT output."}), 500
-
-            try:
-                quiz = json.loads(json_match.group(0))
-            except Exception as e:
-                return jsonify({"error": f"❌ Failed to parse quiz JSON: {str(e)}"}), 500
-
+CONTENT:
+{text[:3500]}"""
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role":"user","content":prompt}]
+            )
+            quiz = parse_json_strict(response.choices[0].message.content, want="array")
             return jsonify({"quiz": quiz})
 
         elif task == "studyguide":
             if len(text.split()) < 150:
                 return jsonify({"error": "Study guide too short to extract lessons."}), 400
-            prompt = f"Extract 3 major topics from the following study guide and find 1 useful YouTube video link for each:\n\n{text[:3000]}"
-            messages = [{"role": "user", "content": prompt}]
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=messages)
-            return jsonify({"studyguide": response.choices[0].message.content.strip()})
+            prompt = f"""Extract 3 major topics with 1‑sentence summaries from the content below.
+Return ONLY JSON array: [{{"title":"...","summary":"..."}}, ...]
+CONTENT:
+{text[:3500]}"""
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role":"user","content":prompt}]
+            )
+            topics = parse_json_strict(response.choices[0].message.content, want="array")
+            for t in topics:
+                t["video"] = search_youtube_precise("", t.get("title",""))
+            return jsonify({"studyguide": topics})
 
         return jsonify({"error": "Invalid task"}), 400
 
     except Exception as e:
         return jsonify({"error": f"Failed to generate: {str(e)}"}), 500
 
-from flask import request, jsonify
 @app.route("/flashcards/<subject>")
 def flashcards_page(subject):
     return render_template("flashcards.html", subject=subject)
 
 @app.route('/generate_flashcard_quiz', methods=['POST'])
 def generate_flashcard_quiz():
-    data = request.json
-    subject = data.get('subject')
-    count = data.get('questionCount', 5)
+    data = request.get_json(force=True, silent=True) or {}
+    subject = data.get('subject', '')
+    count = int(data.get('questionCount', 5))
     difficulty = data.get('difficulty', 'Medium')
 
     prompt = f"""
-    Generate {count} specific multiple choice quiz questions about {subject}.
-    Difficulty level: {difficulty}.
-    Each question should be JSON formatted like this:
-    {{
-      "question": "...",
-      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
-      "answer": "A"
-    }}
-    Return as a JSON array.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a quiz generator."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-
+Generate {count} multiple-choice questions about "{subject}" at {difficulty} difficulty.
+Return ONLY JSON array:
+[
+  {{
+    "question":"...",
+    "options":["A) ...","B) ...","C) ...","D) ..."],
+    "answer":"A"
+  }},
+  ...
+]
+"""
     try:
-        raw = response.choices[0].message.content.strip()
-        quiz = json.loads(raw)
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role":"system","content":"You are a precise quiz generator."},
+                {"role":"user","content":prompt}
+            ]
+        )
+        quiz = parse_json_strict(response.choices[0].message.content, want="array")
         return jsonify({"success": True, "quiz": quiz})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e), "raw": raw})
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/generate_flashcards_from_subject', methods=['POST'])
 def generate_flashcards_from_subject():
-    subject = request.json.get("subject", "")
-    print("SUBJECT RECEIVED:", subject)
-
+    data = request.get_json(force=True, silent=True) or {}
+    subject = data.get("subject", "").strip()
     if not subject:
         return jsonify({"success": False, "error": "No subject provided"})
 
-    prompt = f"Generate 10 flashcards for the subject: {subject}. Format as JSON: " \
-             f"[{{\"term\": \"...\", \"definition\": \"...\"}}, ...]"
+    prompt = f"""Generate 12 flashcards for "{subject}".
+Return ONLY JSON array: [{{"term":"...","definition":"..."}}, ...]"""
 
     try:
         response = client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role":"user","content":prompt}]
         )
-        raw = response.choices[0].message.content.strip()
-        print("RAW OPENAI RESPONSE:", raw)  # 👈 THIS IS KEY
-
-        flashcards = json.loads(raw)
+        flashcards = parse_json_strict(response.choices[0].message.content, want="array")
         return jsonify({"success": True, "flashcards": flashcards})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
-
-
-
-
 
 if __name__ == "__main__":
     app.run(debug=True)

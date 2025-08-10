@@ -3,353 +3,187 @@
 <head>
   <meta charset="UTF-8">
   <title>Flashcards – {{ subject }}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background: black;
-      color: white;
-      font-family: 'Segoe UI', sans-serif;
-      padding: 20px;
+    body { background:#0b0f17; color:#e5e7eb; }
+    .nav-glass { background: linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.2)); backdrop-filter: blur(10px); }
+    .container { max-width: 980px; }
+    .loader { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:20; }
+    .glass { background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); border-radius:16px; }
+    .btn-acc{ background: linear-gradient(90deg, #7c3aed, #6ee7ff); border:none; color:#0b0f17 !important; font-weight:700; }
+
+    .flashcard{ width:90%; max-width:680px; height:50vh; margin:24px auto; perspective:1000px; cursor:pointer; }
+    .flashcard .inner{ position:relative; width:100%; height:100%; transform-style:preserve-3d; transition: transform .7s; }
+    .flashcard.flipped .inner{ transform: rotateY(180deg); }
+    .face{
+      position:absolute; inset:0; backface-visibility:hidden; display:flex; align-items:center; justify-content:center;
+      border-radius: 16px; padding: 22px;
+      background: linear-gradient(180deg, #1b2230, #0f1522);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 14px 34px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+      color: #e8f0ff; font-size: clamp(1rem, 2.8vw, 1.35rem); font-weight: 700; text-align: center;
     }
-    /* Full-page flashcard loader */
-    #flashcard-loader {
-      position: fixed; top:0; left:0;
-      width:100%; height:100%;
-      background:black;
-      display:flex; flex-direction:column;
-      justify-content:center; align-items:center;
-      z-index:2000;
-    }
-    #flashcard-loader p {
-      margin-top:1rem;
-      color:#bbb;
-      font-size:1.1rem;
-      text-align:center;
-    }
-    /* Main content hidden until ready */
-    #flashcardsContent {
-      display:none;
-      opacity:0;
-      transition:opacity 0.3s ease;
-    }
-    #flashcardsContent.show {
-      opacity:1;
-    }
-    /* Flashcard styling */
-    .flashcard {
-      width:80%; max-width:600px;
-      height:60vh; margin:40px auto;
-      perspective:1000px;
-    }
-    .card-inner {
-      position:relative;
-      width:100%; height:100%;
-      transition:transform 0.8s;
-      transform-style:preserve-3d;
-    }
-    .card-inner.flipped {
-      transform:rotateY(180deg);
-    }
-    .card-front, .card-back {
-      position:absolute; width:100%; height:100%;
-      backface-visibility:hidden;
-      display:flex; align-items:center; justify-content:center;
-      border:1px solid #ccc; border-radius:12px;
-      padding:10px; background:#222;
-      font-size:1.3rem;
-    }
-    .card-back {
-      transform:rotateY(180deg);
-    }
-    /* Vocab table */
-    table.vocab-table {
-      margin-top:30px; width:100%;
-      font-size:0.85rem; opacity:0.7;
-    }
-    table.vocab-table th,
-    table.vocab-table td {
-      border:1px solid white; padding:10px;
-    }
+    .back{ transform: rotateY(180deg); background: linear-gradient(180deg, #101826, #0b1220); color:#fff; font-weight:600; }
+
+    .card.glass h5, .card.glass h4, .card.glass strong { color:#F6FAFF; }
+   
+#quiz-section h5,
+#quiz-section .result-text,
+#quiz-section .card.glass strong{
+  color:#EAF2FF !important;
+  opacity:1 !important;
+}
+
   </style>
 </head>
 <body>
+<nav class="navbar navbar-expand-lg nav-glass sticky-top px-3">
+  <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+    <img src="{{ url_for('static', filename='Sattys.png') }}" alt="StudyCore logo"
+         width="28" height="28" class="rounded-circle"
+         style="box-shadow:0 0 0 2px rgba(255,255,255,.12);">
+    <span style="font-weight:900;background:linear-gradient(90deg,#fff,#a5f3fc 55%,#c4b5fd 90%);
+                 -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">
+      Studycore<span style="filter:drop-shadow(0 0 8px rgba(124,58,237,.45))"></span>
+    </span>
+  </a>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/upload" class="btn btn-sm btn-outline-light">Upload</a>
+    <a href="#" class="btn btn-sm btn-acc">Login</a>
+  </div>
+</nav>
 
-  <!-- Flashcard loader overlay -->
-  <div id="flashcard-loader">
-    <div class="spinner-border text-light" role="status">
-      <span class="visually-hidden">Loading…</span>
+<div id="flashcard-loader" class="loader">
+  <div class="text-center">
+    <div class="spinner-border text-light" role="status"></div>
+    <p class="mt-2 text-secondary">Generating flashcards…</p>
+  </div>
+</div>
+
+<div class="container py-4" id="flashcardsContent" style="display:none;">
+  <h1 class="text-center fw-bold">📇 Flashcards — “{{ subject }}”</h1>
+
+  <div class="flashcard" id="fc">
+    <div class="inner">
+      <div class="face" id="fc-front">Loading…</div>
+      <div class="face back" id="fc-back">Loading…</div>
     </div>
-    <p>Generating flashcards…<br>this may take a moment.</p>
+  </div>
+  <p class="text-center" id="fc-count">Card 1 of 1</p>
+  <div class="text-center mb-4">
+    <button class="btn btn-outline-light me-2" id="prev">⬅️ Prev</button>
+    <button class="btn btn-outline-light" id="next">➡️ Next</button>
   </div>
 
-  <!-- Main flashcards content -->
-  <div id="flashcardsContent">
-    <h1 class="text-center">📇 Flashcards for “{{ subject }}”</h1>
-
-    <div class="flashcard">
-      <div class="card-inner" id="card-inner">
-        <div class="card-front" id="flashcard-front">Loading…</div>
-        <div class="card-back" id="flashcard-back">Loading…</div>
-      </div>
-      <p class="text-center mt-2" id="card-count">Card 1 of 10</p>
-    </div>
-
-    <div class="text-center mb-4">
-      <button class="btn btn-light me-2" onclick="flipCard()">Flip</button>
-      <button class="btn btn-secondary" onclick="nextCard()">Next</button>
-    </div>
-
-    <h3 class="mt-5">🧠 Vocabulary Table</h3>
-    <table class="vocab-table table table-dark table-striped">
-      <thead>
-        <tr><th>Term</th><th>Definition</th></tr>
-      </thead>
-      <tbody id="vocab-body"></tbody>
-    </table>
-
-    <h3 class="mt-5">📝 Generate Quiz</h3>
-    <form id="quizForm" class="d-flex align-items-center mb-3">
-      <label class="me-2 mb-0"># Questions:</label>
-      <input id="questionCount" type="number" value="5" min="1" max="15"
-             class="form-control w-25 me-3">
-      <label class="me-2 mb-0">Difficulty:</label>
-      <select id="difficulty" class="form-select w-auto me-3">
-        <option>Easy</option>
-        <option selected>Medium</option>
-        <option>Hard</option>
-      </select>
-      <button type="submit" class="btn btn-info">Generate Quiz</button>
-    </form>
-
-    <!-- Quiz loader -->
-    <div id="quiz-loader" class="text-center mb-3" style="display:none;">
-      <div class="spinner-border text-info" role="status">
-        <span class="visually-hidden">Loading quiz…</span>
-      </div>
-      <p class="mt-2" style="color:#00bcd4;">Generating quiz…</p>
-    </div>
-
-    <!-- Quiz container -->
-    <div id="quiz-section"></div>
-
-    <div class="text-center mt-4">
-      <button class="btn btn-outline-light" onclick="window.history.back()">
-        🔙 Back to Course
-      </button>
+  <h3 class="mt-4">🧠 Vocabulary</h3>
+  <div class="glass p-3">
+    <div class="table-responsive">
+      <table class="table table-dark table-striped">
+        <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+        <tbody id="vocab-body"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- Flashcards loader & fetch script -->
-  <script>
-    function showContent() {
-      document.getElementById("flashcard-loader").style.display = "none";
-      const c = document.getElementById("flashcardsContent");
-      c.style.display = "block";
-      setTimeout(() => c.classList.add("show"), 10);
-    }
-    function hideContent() {
-      const c = document.getElementById("flashcardsContent");
-      c.classList.remove("show");
-      c.style.display = "none";
-      document.getElementById("flashcard-loader").style.display = "flex";
-    }
+  <h3 class="mt-4">📝 Generate Quiz</h3>
+  <form id="quizForm" class="d-flex align-items-center gap-2 glass p-3">
+    <label class="mb-0"># Questions:</label>
+    <input id="questionCount" type="number" value="6" min="1" max="15" class="form-control w-auto">
+    <label class="mb-0">Difficulty:</label>
+    <select id="difficulty" class="form-select w-auto">
+      <option>Easy</option><option selected>Medium</option><option>Hard</option>
+    </select>
+    <button type="submit" class="btn btn-acc">Generate Quiz</button>
+  </form>
 
-    let flashcards = [], current = 0;
+  <div id="quiz-loader" class="text-center my-3" style="display:none;">
+    <div class="spinner-border text-info" role="status"></div>
+    <p class="mt-2 text-info">Generating quiz…</p>
+  </div>
 
-    function loadCard(i) {
-      const fc = flashcards[i] || {};
-      document.getElementById("flashcard-front").innerText = fc.term || "N/A";
-      document.getElementById("flashcard-back").innerText  = fc.definition || "N/A";
-      document.getElementById("card-count").innerText = `Card ${i+1} of ${flashcards.length}`;
-    }
+  <div id="quiz-section"></div>
 
-    function populateVocabTable() {
-      const tbody = document.getElementById("vocab-body");
-      tbody.innerHTML = "";
-      flashcards.forEach(fc => {
-        tbody.innerHTML += `<tr><td>${fc.term}</td><td>${fc.definition}</td></tr>`;
-      });
-    }
+  <div class="text-center my-4">
+    <a class="btn btn-outline-light" href="javascript:history.back()">🔙 Back to Course</a>
+  </div>
+</div>
 
-    function renderFlashcardPage() {
-      current = 0;
-      if (!flashcards.length) {
-        document.getElementById("card-count").innerText = "No flashcards.";
-        document.getElementById("flashcard-front").innerText = "–";
-        document.getElementById("flashcard-back").innerText  = "–";
-      } else {
-        loadCard(0);
-        populateVocabTable();
-      }
-    }
+<script>
+let flashcards=[], current=0;
+function showContent(){ document.getElementById("flashcard-loader").style.display="none"; document.getElementById("flashcardsContent").style.display="block"; }
+function setCard(i){ const fc=flashcards[i]||{}; document.getElementById("fc-front").textContent=fc.term||"—"; document.getElementById("fc-back").textContent=fc.definition||"—"; document.getElementById("fc-count").textContent=`Card ${i+1} of ${flashcards.length||1}` }
+function populateVocab(){ const tb=document.getElementById("vocab-body"); tb.innerHTML=""; (flashcards||[]).forEach(fc=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td>${fc.term||"—"}</td><td>${fc.definition||"—"}</td>`; tb.appendChild(tr); }) }
 
-    async function fetchFlashcards() {
-      hideContent();
-      try {
-        const res = await fetch("/generate_flashcards_from_subject", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ subject: "{{ subject }}" })
-        });
-        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        const data = await res.json();
-        let cards = [];
-        if (Array.isArray(data.flashcards)) {
-          cards = data.flashcards;
-        } else if (Array.isArray(data)) {
-          cards = data;
-        } else if (data.success && Array.isArray(data.flashcards)) {
-          cards = data.flashcards;
-        } else {
-          throw new Error(data.error || "Invalid response format");
-        }
-        flashcards = cards;
-        sessionStorage.setItem("flashcardsData", JSON.stringify(cards));
-        renderFlashcardPage();
-      } catch (err) {
-        console.error("Error loading flashcards:", err);
-        document.getElementById("flashcardsContent").innerHTML = `
-          <h1 class="text-center">❌ Failed to load flashcards</h1>
-          <p class="text-danger text-center">${err.message}</p>
-          <div class="text-center mt-4">
-            <button class="btn btn-outline-light" onclick="window.history.back()">
-              🔙 Back to Course
-            </button>
-          </div>`;
-      } finally {
-        showContent();
-      }
-    }
+async function fetchFlashcards(){
+  try{
+    const res = await fetch("/generate_flashcards_from_subject", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ subject: "{{ subject }}" }) });
+    const data = await res.json();
+    if(!data.success) throw new Error(data.error||"Failed");
+    flashcards = Array.isArray(data.flashcards) ? data.flashcards : [];
+    current = 0; setCard(0); populateVocab();
+  }catch(e){
+    document.getElementById("flashcardsContent").innerHTML = `<div class="alert alert-danger">❌ Failed to load flashcards: ${e.message}</div>`;
+  }finally{ showContent(); }
+}
 
-    function loadOrFetchFlashcards(){
-      const cached = sessionStorage.getItem("flashcardsData");
-      if (cached) {
-        try { flashcards = JSON.parse(cached); }
-        catch {}
-        renderFlashcardPage();
-        return showContent();
-      }
-      fetchFlashcards();
-    }
+document.addEventListener("DOMContentLoaded", ()=>{
+  const card = document.getElementById("fc");
+  card.addEventListener("click", ()=> card.classList.toggle("flipped"));
+  document.getElementById("prev").addEventListener("click", ()=>{ current=Math.max(0,current-1); card.classList.remove("flipped"); setCard(current); });
+  document.getElementById("next").addEventListener("click", ()=>{ current=Math.min((flashcards.length||1)-1,current+1); card.classList.remove("flipped"); setCard(current); });
+  fetchFlashcards();
+});
 
-    function flipCard(){
-      document.getElementById("card-inner").classList.toggle("flipped");
-    }
-    function nextCard(){
-      current = (current + 1) % flashcards.length;
-      document.getElementById("card-inner").classList.remove("flipped");
-      loadCard(current);
-    }
+// Quiz
+function showQuizLoader(){ document.getElementById("quiz-loader").style.display="block"; }
+function hideQuizLoader(){ document.getElementById("quiz-loader").style.display="none"; }
+let quizData=[], qi=0, qs=0;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadOrFetchFlashcards();
+function renderQuizQuestion(){
+  const c=document.getElementById("quiz-section");
+  if(!quizData.length){ c.innerHTML="<p class='text-secondary'>No quiz yet.</p>"; return; }
+  if(qi>=quizData.length){
+    const pct=Math.round((qs/quizData.length)*100);
+    c.innerHTML=`<div class="card glass p-4 text-center quiz-result">
+  <h4>✅ Quiz Complete!</h4>
+  <p class="result-text">Your Score: ${qs} / ${quizData.length} (${pct}%)</p>
+  <button class="btn btn-outline-light mt-3" onclick="qi=qs=0; renderQuizQuestion()">🔁 Retry</button>
+</div>`;
+
+    return;
+  }
+  const q=quizData[qi];
+  let html=`<div class="card glass p-3"><h5>${q.question}</h5><div class="mt-3">`;
+  (q.options||[]).forEach(o=>{ const L=o.trim().charAt(0).toUpperCase(); html+=`<button class="btn btn-outline-light btn-answer w-100 my-1 text-start" data-letter="${L}">${o}</button>`; });
+  html+=`</div><div class="d-flex justify-content-end mt-3">`; html+= qi<quizData.length-1?`<button class="btn btn-secondary btn-next">Next</button>`:`<button class="btn btn-acc btn-finish">Finish</button>`; html+=`</div></div>`;
+  c.innerHTML=html;
+}
+document.getElementById("quiz-section").addEventListener("click", e=>{
+  const t=e.target;
+  if(t.matches(".btn-answer")){
+    const sel=t.dataset.letter, corr=quizData[qi].answer.trim().charAt(0).toUpperCase();
+    document.querySelectorAll("#quiz-section .btn-answer").forEach(b=>{
+      b.disabled=true; const L=b.dataset.letter; b.classList.remove("btn-outline-light");
+      if(L===corr) b.classList.add("btn-success"); else if(b===t) b.classList.add("btn-danger");
     });
-  </script>
-
-  <!-- Quiz script with its own loader -->
-  <script>
-    function showQuizLoader(){
-      document.getElementById("quiz-loader").style.display = "block";
-    }
-    function hideQuizLoader(){
-      document.getElementById("quiz-loader").style.display = "none";
-    }
-
-    let quizData = [], qi = 0, qs = 0;
-
-    function renderQuizQuestion(){
-      const c = document.getElementById("quiz-section");
-      if (!quizData.length){
-        c.innerHTML = "<p>No quiz available.</p>";
-        return;
-      }
-      if (qi >= quizData.length){
-        const pct = Math.round((qs/quizData.length)*100);
-        c.innerHTML = `
-          <div class="card p-4 text-center">
-            <h4>✅ Quiz Complete!</h4>
-            <p>Your Score: ${qs} / ${quizData.length} (${pct}%)</p>
-            <button class="btn btn-outline-primary btn-retry mt-3">🔁 Retry Quiz</button>
-          </div>`;
-        return;
-      }
-      const q = quizData[qi];
-      let html = `<div class="card p-3"><h5>${q.question}</h5><div class="mt-3">`;
-      q.options.forEach(o=>{
-        const L = o.trim().charAt(0).toUpperCase();
-        html += `<button class="btn btn-outline-primary btn-answer w-100 my-1" data-letter="${L}">${o}</button>`;
-      });
-      html += `</div><div class="d-flex justify-content-between mt-3">`;
-      if (qi < quizData.length-1){
-        html += `<button class="btn btn-secondary btn-next">Next</button>`;
-      } else {
-        html += `<button class="btn btn-success btn-finish">Finish</button>`;
-      }
-      html += `</div></div>`;
-      c.innerHTML = html;
-    }
-
-    document.getElementById("quiz-section").addEventListener("click", e => {
-      const t = e.target;
-      if (t.matches(".btn-answer")){
-        const sel = t.dataset.letter;
-        const corr = quizData[qi].answer.trim().charAt(0).toUpperCase();
-        document.querySelectorAll("#quiz-section .btn-answer").forEach(b=>{
-          b.disabled = true;
-          const L = b.dataset.letter;
-          b.classList.remove("btn-outline-primary");
-          if (L === corr) b.classList.add("btn-success");
-          else if (b === t) b.classList.add("btn-danger");
-        });
-        if (sel === corr) qs++;
-        return;
-      }
-      if (t.matches(".btn-next")){
-        qi++; renderQuizQuestion(); return;
-      }
-      if (t.matches(".btn-finish")){
-        qi++; renderQuizQuestion(); return;
-      }
-      if (t.matches(".btn-retry")){
-        qi = qs = 0; renderQuizQuestion(); return;
-      }
-    });
-
-    async function generateQuiz(){
-      showQuizLoader();
-      document.getElementById("quiz-section").innerHTML = "";
-      try {
-        const count = parseInt(document.getElementById("questionCount").value);
-        const diff  = document.getElementById("difficulty").value;
-        const res = await fetch("/generate_flashcard_quiz", {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            subject:"{{ subject }}",
-            questionCount:count,
-            difficulty:diff
-          })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        if (!data.success || !Array.isArray(data.quiz)) throw new Error("Bad quiz data");
-        quizData = data.quiz; qi = qs = 0;
-        renderQuizQuestion();
-      } catch (err) {
-        console.error("Quiz error:", err);
-        alert("❌ Error generating quiz.");
-      } finally {
-        hideQuizLoader();
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("quizForm").addEventListener("submit", e=>{
-        e.preventDefault();
-        generateQuiz();
-      });
-    });
-  </script>
-
+    if(sel===corr) qs++; return;
+  }
+  if(t.matches(".btn-next")){ qi++; renderQuizQuestion(); return; }
+  if(t.matches(".btn-finish")){ qi++; renderQuizQuestion(); return; }
+});
+document.getElementById("quizForm").addEventListener("submit", async (e)=>{
+  e.preventDefault(); showQuizLoader(); document.getElementById("quiz-section").innerHTML="";
+  try{
+    const count=+document.getElementById("questionCount").value;
+    const diff=document.getElementById("difficulty").value;
+    const res=await fetch("/generate_flashcard_quiz",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ subject:"{{ subject }}", questionCount:count, difficulty:diff })});
+    const data=await res.json();
+    if(!data.success || !Array.isArray(data.quiz)) throw new Error(data.error||"Invalid quiz");
+    quizData=data.quiz; qi=0; qs=0; renderQuizQuestion();
+  }catch(err){ alert("❌ Error generating quiz."); }
+  finally{ hideQuizLoader(); }
+});
+</script>
 </body>
 </html>
