@@ -321,16 +321,20 @@ document.querySelector('[data-bs-target="#quiz"]')?.addEventListener('click', ()
   const { subject, topics } = JSON.parse(dataEl.textContent);
 
   fetch("/generate_quiz", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ subject, topics })
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    subject: subject,
+    topics: topics,
+    studyguide_topics: window.studyguideTopics || null // Pass if available, else null
   })
-  .then(r => r.json())
-  .then(data => {
-    if (tinyBar) {
-  tinyBar.classList.remove("active");
-  tinyBar.style.display = "none";
-}
+})
+.then(r => r.json())
+.then(data => {
+  if (tinyBar) {
+    tinyBar.classList.remove("active");
+    tinyBar.style.display = "none";
+  }
 
     if (!Array.isArray(data.quiz)) { container.innerHTML = "<p>❌ Failed to load quiz. Please try again.</p>"; return; }
 

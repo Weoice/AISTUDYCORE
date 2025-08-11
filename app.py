@@ -213,31 +213,115 @@ Return ONLY JSON array:
 
 @app.route("/generate_quiz", methods=["POST"])
 def generate_quiz():
+    """
+    Generates a HARD quiz constrained to provided topics.
+    Prefers `studyguide_topics` (titles or {title,summary}) if present; else uses `topics`.
+    """
     data = request.get_json(force=True, silent=True) or {}
-    subject = data.get("subject", "")
-    all_titles = data.get("topics", [])
+    subject = (data.get("subject") or "").strip()
 
-    prompt = f"""Generate 10 specific multiple choice questions for "{subject}" covering:
-""" + "\n".join(f"- {t}" for t in all_titles) + """
-Return ONLY JSON array:
+    # Accept either strings or dicts with "title"
+    def _to_titles(lst):
+        if not isinstance(lst, list):
+            return []
+        titles = []
+        for it in lst:
+            if isinstance(it, str):
+                titles.append(it.strip())
+            elif isinstance(it, dict) and it.get("title"):
+                titles.append(str(it["title"]).strip())
+        # de-dupe while preserving order
+        seen = set(); out = []
+        for t in titles:
+            if t and t not in seen:
+                seen.add(t); out.append(t)
+        return out
+
+    guide_titles = _to_titles(data.get("studyguide_topics", []))
+    course_titles = _to_titles(data.get("topics", []))
+    allowed_topics = guide_titles or course_titles
+
+    # Guardrail: if nothing provided, bail early
+    if not allowed_topics:
+        return jsonify({"error": "No topics provided for quiz generation."}), 400
+
+    topics_bulleted = "\n".join(f"- {t}" for t in allowed_topics)
+
+    prompt = f"""
+You are a subject-matter expert and exam writer.
+Create 10 HARD multiple-choice questions for the course "{subject}".
+
+CONSTRAINTS:
+- Only cover the following topics (do NOT stray outside them):
+{topics_bulleted}
+- No definition/recall questions (no "what is", "which of the following best defines", etc.).
+- Use higher-order thinking (application, analysis, synthesis). Prefer multi-step reasoning.
+- When applicable, make answers require computation, comparison, or scenario analysis.
+- Options must be plausible, with only one correct choice; label options EXACTLY: "A) ...", "B) ...", "C) ...", "D) ...".
+- The correct answer must be returned as a single capital letter: "A" | "B" | "C" | "D".
+- Avoid repeating question stems or testing the same micro-concept twice.
+
+Return ONLY valid JSON array in this shape:
 [
-  {
-    "question": "...",
-    "options": ["A) ...","B) ...","C) ...","D) ..."],
-    "answer": "C"
-  }
-  ...
+  {{
+    "question": "…",
+    "options": ["A) …","B) …","C) …","D) …"],
+    "answer": "B"
+  }},
+  …
 ]
-"""
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role":"user","content":prompt}]
-    )
+    """.strip()
+
+    # Use your existing OpenAI client
     try:
-        quiz = parse_json_strict(response.choices[0].message.content, want="array")
-        return jsonify({"quiz": quiz})
+        resp = client.chat.completions.create(
+            # if you have access, "gpt-4" or "gpt-4o" will give stronger results; otherwise keep 3.5
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.35  # lower temp = tighter, harder questions
+        )
+
+        raw = resp.choices[0].message.content.strip()
+
+        # Prefer your existing strict JSON extractor if present
+        try:
+            quiz = parse_json_strict(raw, want="array")  # keep if you already defined it
+        except Exception:
+            import re, json
+            m = re.search(r"\[\s*(?:\{.*?\}\s*,\s*)*\{.*?\}\s*\]", raw, re.S)
+            quiz = json.loads(m.group(0) if m else raw)
+
+        # Final sanity filter: keep only valid items
+        cleaned = []
+        for q in quiz:
+            if not isinstance(q, dict): continue
+            if not q.get("question"): continue
+            opts = q.get("options")
+            ans  = (q.get("answer") or "").strip().upper()
+            if not (isinstance(opts, list) and len(opts) == 4): continue
+            if ans not in {"A","B","C","D"}: continue
+            # enforce A) ... format
+            if not all(isinstance(o, str) and o.strip().startswith(x+")") for x,o in zip("ABCD", opts)):
+                # try to coerce if needed
+                coerced = []
+                for idx, o in enumerate(opts):
+                    prefix = "ABCD"[idx]
+                    text = str(o).strip()
+                    coerced.append(text if text.startswith(prefix+")") else f"{prefix}) {text}")
+                q["options"] = coerced
+            cleaned.append({
+                "question": str(q["question"]).strip(),
+                "options": q["options"],
+                "answer": ans
+            })
+
+        if not cleaned:
+            return jsonify({"error": "Model returned no usable questions."}), 500
+
+        return jsonify({"quiz": cleaned})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/upload", methods=["GET"])
 def upload():
